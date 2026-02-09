@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { FocusRecord, ProjectCategory } from '../types';
 
@@ -29,7 +28,6 @@ const StatsBoard: React.FC<StatsBoardProps> = ({ history, categories }) => {
     const records = history.filter(r => now - r.timestamp <= periodMs);
     
     const categoryTotals: Record<string, number> = {};
-    // Initialize with current categories + any in history
     const allSeenCategories = new Set([...categories, ...records.map(r => r.category)]);
     allSeenCategories.forEach(cat => categoryTotals[cat] = 0);
 
@@ -44,28 +42,30 @@ const StatsBoard: React.FC<StatsBoardProps> = ({ history, categories }) => {
 
   const detailData = useMemo(() => {
     if (!drillDown) return null;
-    
     const categoryRecords = history.filter(r => r.category === drillDown);
     const dateGroups: Record<string, number> = {};
-    
     categoryRecords.forEach(r => {
       const dateStr = new Date(r.timestamp).toLocaleDateString();
       dateGroups[dateStr] = (dateGroups[dateStr] || 0) + r.duration;
     });
-
     const totalCategoryMins = categoryRecords.reduce((a, b) => a + b.duration, 0);
-
     return { dateGroups, totalCategoryMins };
   }, [history, drillDown]);
 
-  // Color palette for dynamic categories
   const getCategoryColor = (cat: string, index: number) => {
     const baseColors = ['#8b4513', '#4a3728', '#166534', '#a67c52', '#5d4037', '#3e2723', '#2e7d32'];
     return baseColors[index % baseColors.length];
   };
 
   const renderPieChart = () => {
-    if (stats.grandTotal === 0) return <div className="w-full h-full flex items-center justify-center text-[#8b4513]/20 font-bold">No Data</div>;
+    // 修正：如果没数据，返回一个透明的圆环，防止内容重叠
+    if (stats.grandTotal === 0) {
+      return (
+        <svg viewBox="-1 -1 2 2" className="w-full h-full transform -rotate-90">
+          <circle cx="0" cy="0" r="0.9" fill="transparent" stroke="#8b4513" strokeWidth="0.1" strokeDasharray="0.1 0.2" className="opacity-10" />
+        </svg>
+      );
+    }
     
     let cumulativePercent = 0;
     const slices = Object.entries(stats.categoryTotals).map(([cat, val], index) => {
@@ -102,9 +102,7 @@ const StatsBoard: React.FC<StatsBoardProps> = ({ history, categories }) => {
     <div className="w-full max-w-5xl bg-[#fdfbf7] p-8 rounded-2xl border-4 border-[#8b4513] shadow-2xl animate-in fade-in zoom-in duration-300">
       <div className="flex flex-col md:flex-row justify-between items-center mb-10 gap-6">
         <div className="text-center md:text-left">
-          <h2 className="text-2xl font-bold heytea-font uppercase tracking-widest text-[#8b4513]">
-            Kitchen Journal
-          </h2>
+          <h2 className="text-2xl font-bold heytea-font uppercase tracking-widest text-[#8b4513]">Kitchen Journal</h2>
           <p className="text-sm opacity-60 font-medium">Total focus time: {formatDuration(stats.grandTotal)}</p>
         </div>
         
@@ -123,11 +121,14 @@ const StatsBoard: React.FC<StatsBoardProps> = ({ history, categories }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-12 items-start">
         <div className="md:col-span-5 flex flex-col items-center">
-           <div className="w-64 h-64 relative mb-8">
+           <div className="w-64 h-64 relative mb-8 flex items-center justify-center">
              {renderPieChart()}
              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-               <span className="text-2xl font-bold">{stats.count}</span>
+               <span className="text-3xl font-bold text-[#8b4513]">{stats.count}</span>
                <span className="text-[10px] font-bold opacity-40 uppercase tracking-widest">Pots Done</span>
+               {stats.grandTotal === 0 && (
+                 <span className="text-[10px] text-[#8b4513]/40 mt-1 font-bold italic">No Data</span>
+               )}
              </div>
            </div>
            
@@ -178,9 +179,6 @@ const StatsBoard: React.FC<StatsBoardProps> = ({ history, categories }) => {
                         <span className="text-sm font-bold text-[#8b4513]">{formatDuration(mins)}</span>
                      </div>
                    ))}
-                   {Object.keys(detailData.dateGroups).length === 0 && (
-                     <p className="text-xs italic opacity-40 text-center py-10">No sessions recorded for this category yet.</p>
-                   )}
                 </div>
              </div>
            ) : (
