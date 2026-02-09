@@ -34,7 +34,7 @@ const Pantry: React.FC<PantryProps> = ({ items, selectedId, onSelect, title }) =
             </div>
             <span className="text-sm font-bold heytea-font tracking-wider">{item.name}</span>
             <span className={`text-[10px] mt-1 heytea-font ${selectedId === item.id ? 'opacity-80' : 'text-gray-400'}`}>
-              {item.duration} 分钟
+              {item.duration} min
             </span>
           </button>
         ))}
