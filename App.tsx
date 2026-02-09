@@ -158,10 +158,10 @@ const App: React.FC = () => {
         <div className="flex flex-col md:flex-row items-center gap-6 w-full justify-between border-t border-[#8b4513]/10 pt-6">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-3 bg-white/40 px-4 py-2 rounded-full border border-[#8b4513]/20 shadow-sm">
-               <span className="text-[10px] font-bold uppercase tracking-widest opacity-50">Event:</span>
-               <select value={currentCategory} onChange={(e) => setCurrentCategory(e.target.value)} className="bg-transparent border-none text-xs font-bold text-[#8b4513] focus:ring-0 cursor-pointer p-0 pr-6">
-                 {categories.map(cat => (<option key={cat} value={cat}>{cat}</option>))}
-               </select>
+                <span className="text-[10px] font-bold uppercase tracking-widest opacity-50">Event:</span>
+                <select value={currentCategory} onChange={(e) => setCurrentCategory(e.target.value)} className="bg-transparent border-none text-xs font-bold text-[#8b4513] focus:ring-0 cursor-pointer p-0 pr-6">
+                  {categories.map(cat => (<option key={cat} value={cat}>{cat}</option>))}
+                </select>
             </div>
             <button onClick={() => setShowCatModal(true)} className="w-8 h-8 flex items-center justify-center bg-[#e5dec9] hover:bg-[#dcd1b3] rounded-full text-[#8b4513]">⚙️</button>
           </div>
