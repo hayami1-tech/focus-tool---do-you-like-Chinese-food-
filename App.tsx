@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { TimerMode, FoodItem, TimerStatus, ProjectCategory, FocusRecord } from './types';
 import { FOOD_ITEMS, BREAK_ITEMS } from './constants';
@@ -145,6 +144,14 @@ const App: React.FC = () => {
     setCategoryToDelete(null);
   };
 
+  // 💡 这里的逻辑实现了你的需求：
+  // 过滤出只有当天的记录，用于右侧显示
+  const dailyHistory = history.filter(record => {
+    const recordDate = new Date(record.timestamp).toDateString();
+    const today = new Date().toDateString();
+    return recordDate === today;
+  });
+
   return (
     <div className="min-h-screen bg-[#f3eee3] text-[#4a3728] p-4 md:p-8 flex flex-col items-center">
       <header className="w-full max-w-6xl flex flex-col items-center mb-10 gap-6">
@@ -194,7 +201,6 @@ const App: React.FC = () => {
 
       {activeTab === 'FOCUS' ? (
         <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-in fade-in slide-in-from-bottom-4 duration-500">
-          {/* Left Column: Stove and Timer */}
           <div className="lg:col-span-7 flex flex-col items-center relative">
             <Stove isCooking={status === 'RUNNING'} food={selectedFood} status={status} />
             <div className="mt-8 w-full">
@@ -210,7 +216,6 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          {/* Right Column: Pantry and Dish Collection - Pushed down to align with Stove Top */}
           <div className="lg:col-span-5 flex flex-col gap-0 h-full lg:mt-24">
             <Pantry 
               items={mode === TimerMode.FOCUS ? FOOD_ITEMS : BREAK_ITEMS} 
@@ -221,14 +226,20 @@ const App: React.FC = () => {
               onModeToggle={toggleMode}
             />
             
-            <DishCollection history={history} />
+            {/* 💡 这里改为只传 dailyHistory (当天的菜) */}
+            <DishCollection history={dailyHistory} />
+            
+            <p className="mt-4 text-[9px] text-center opacity-30 font-bold uppercase tracking-widest italic">
+              Table resets daily • Full log in History
+            </p>
           </div>
         </div>
       ) : (
+        /* 💡 历史页面依然传入完整的 history，保证周报月报数据正确 */
         <StatsBoard history={history} categories={categories} />
       )}
 
-      {/* Category Management Modal */}
+      {/* 以下是 Modal 部分，保持原样 */}
       {showCatModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#f3eee3] w-full max-w-md rounded-2xl border-4 border-[#8b4513] shadow-2xl p-6">
@@ -270,7 +281,6 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Merge Confirmation Modal */}
       {showMergeModal && categoryToDelete && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[60] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-sm rounded-3xl p-8 shadow-2xl border-t-8 border-[#8b4513] animate-in zoom-in duration-300">
