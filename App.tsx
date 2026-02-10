@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-// 🛡️ 路径保护：确保 "./types" 和 "./constants" 对应你 src 下的小写文件名
+// 🛡️ 确保 "./types" 和 "./constants" 对应你 src 下的小写文件名
 import { TimerMode, FoodItem, TimerStatus, ProjectCategory, FocusRecord } from './types';
 import { FOOD_ITEMS, BREAK_ITEMS } from './constants';
 
@@ -8,7 +8,7 @@ import Stove from './components/Stove';
 import Pantry from './components/Pantry';
 import TimerDisplay from './components/TimerDisplay';
 import StatsBoard from './components/StatsBoard';
-import DishCollection from './components/DishCollection';
+// DishCollection 已不再被首页使用，如果你彻底不需要它，甚至可以删掉这一行
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'FOCUS' | 'HISTORY'>('FOCUS');
@@ -16,7 +16,6 @@ const App: React.FC = () => {
   const [status, setStatus] = useState<TimerStatus>('IDLE');
   const [selectedFood, setSelectedFood] = useState<FoodItem>(FOOD_ITEMS[0]);
   
-  // 🛡️ 初始化安全阀：防止 localStorage 损坏导致白屏
   const [categories, setCategories] = useState<ProjectCategory[]>(() => {
     try {
       const saved = localStorage.getItem('zao-tai-categories');
@@ -54,7 +53,6 @@ const App: React.FC = () => {
   
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // 持久化存储
   useEffect(() => {
     localStorage.setItem('zao-tai-history', JSON.stringify(history));
   }, [history]);
@@ -89,7 +87,6 @@ const App: React.FC = () => {
     }
   };
 
-  // 计时器逻辑
   useEffect(() => {
     if (status === 'RUNNING' && timeLeft > 0) {
       timerRef.current = setInterval(() => {
@@ -159,10 +156,6 @@ const App: React.FC = () => {
     setCategoryToDelete(null);
   };
 
-  const dailyHistory = history.filter(record => 
-    new Date(record.timestamp).toDateString() === new Date().toDateString()
-  );
-
   return (
     <div className="min-h-screen bg-[#f3eee3] text-[#4a3728] p-4 md:p-8 flex flex-col items-center">
       <header className="w-full max-w-6xl flex flex-col items-center mb-10 gap-6">
@@ -194,22 +187,32 @@ const App: React.FC = () => {
 
       {activeTab === 'FOCUS' ? (
         <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-in fade-in duration-500">
-          <div className="lg:col-span-7 flex flex-col items-center">
+          <div className="lg:col-span-8 flex flex-col items-center">
             <Stove isCooking={status === 'RUNNING'} food={selectedFood} status={status} />
             <div className="mt-8 w-full">
               <TimerDisplay timeLeft={timeLeft} status={status} onStart={startTimer} onPause={pauseTimer} onReset={() => resetTimer()} onTimeChange={handleManualTimeChange} mode={mode} />
             </div>
           </div>
-          <div className="lg:col-span-5 lg:mt-24 flex flex-col gap-4">
-            <Pantry items={mode === TimerMode.FOCUS ? FOOD_ITEMS : BREAK_ITEMS} selectedId={selectedFood.id} onSelect={handleFoodSelect} title={mode === TimerMode.FOCUS ? "Ingredients" : "Snacks"} mode={mode} onModeToggle={toggleMode} />
-            <DishCollection history={dailyHistory} />
+          <div className="lg:col-span-4 lg:mt-24 flex flex-col gap-4">
+            {/* ✅ 只保留 Pantry (食材库)，去掉了 DishCollection (今日菜碟) */}
+            <Pantry 
+              items={mode === TimerMode.FOCUS ? FOOD_ITEMS : BREAK_ITEMS} 
+              selectedId={selectedFood.id} 
+              onSelect={handleFoodSelect} 
+              title={mode === TimerMode.FOCUS ? "Ingredients" : "Snacks"} 
+              mode={mode} 
+              onModeToggle={toggleMode} 
+            />
+            <p className="text-[10px] text-center opacity-30 font-bold uppercase tracking-widest mt-4">
+              Focus to cook • View records in History
+            </p>
           </div>
         </div>
       ) : (
         <StatsBoard history={history} categories={categories} onUpdateHistory={setHistory} />
       )}
 
-      {/* 弹窗代码保持原样 */}
+      {/* Modals 保持不变... */}
       {showCatModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#f3eee3] w-full max-w-md rounded-2xl border-4 border-[#8b4513] shadow-2xl p-6">
