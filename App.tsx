@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { TimerMode, FoodItem, TimerStatus, ProjectCategory, FocusRecord } from './types';
 import { FOOD_ITEMS, BREAK_ITEMS } from './constants';
@@ -36,7 +37,6 @@ const App: React.FC = () => {
   
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // 持久化存储
   useEffect(() => {
     localStorage.setItem('zao-tai-history', JSON.stringify(history));
   }, [history]);
@@ -78,7 +78,8 @@ const App: React.FC = () => {
 
   const handleFinishCountUp = () => {
     const durationMins = Math.floor(timeLeft / 60);
-    if (durationMins > 0) {
+    
+    if (durationMins >= 1) { 
       const record: FocusRecord = {
         id: Date.now().toString(),
         category: currentCategory,
@@ -87,8 +88,13 @@ const App: React.FC = () => {
         foodName: 'Countryside Steamed Rice' 
       };
       setHistory(prev => [record, ...prev]);
-      setStatus('FINISHED');
+      
+      // 归零并恢复到初始状态
+      setTimeLeft(0); 
+      setSessionDurationMins(0);
+      setStatus('IDLE'); 
     } else {
+      alert("Focus time is too short to steam a bowl of rice. Keep going!");
       resetTimer();
     }
   };
@@ -103,18 +109,14 @@ const App: React.FC = () => {
 
   const updateHistory = (newHistory: FocusRecord[]) => setHistory(newHistory);
 
-  // 核心计时器逻辑
   useEffect(() => {
     if (status === 'RUNNING') {
       timerRef.current = setInterval(() => {
         if (mode === TimerMode.COUNT_UP) {
-          // 正计时：无条件增长
           setTimeLeft((prev) => prev + 1);
         } else {
-          // 倒计时逻辑
           setTimeLeft((prev) => {
             if (prev <= 1) {
-              // 计时结束，自动触发出锅
               const record: FocusRecord = {
                 id: Date.now().toString(),
                 category: currentCategory,
@@ -138,6 +140,7 @@ const App: React.FC = () => {
 
   const handleFoodSelect = (food: FoodItem) => {
     if (mode === TimerMode.COUNT_UP) setMode(TimerMode.FOCUS);
+    
     if (status === 'RUNNING') {
       if (confirm('Cooking in progress. Are you sure you want to change the pot?')) {
         setSelectedFood(food);
@@ -222,7 +225,7 @@ const App: React.FC = () => {
           <div className="lg:col-span-7 flex flex-col items-center relative">
             <Stove 
               isCooking={status === 'RUNNING'} 
-              food={mode === TimerMode.COUNT_UP ? FOOD_ITEMS.find(f => f.id === 'free-rice') || FOOD_ITEMS[0] : selectedFood} 
+              food={mode === TimerMode.COUNT_UP ? (FOOD_ITEMS.find(f => f.id === 'free-rice') || FOOD_ITEMS[0]) : selectedFood} 
               status={status} 
             />
             <div className="mt-8 w-full">
@@ -256,7 +259,6 @@ const App: React.FC = () => {
         <StatsBoard history={history} categories={categories} onUpdateHistory={updateHistory} />
       )}
 
-      {/* Modals */}
       {showCatModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#f3eee3] w-full max-w-md rounded-2xl border-4 border-[#8b4513] p-6 shadow-2xl">
