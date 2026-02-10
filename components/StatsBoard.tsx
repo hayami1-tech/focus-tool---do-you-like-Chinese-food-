@@ -14,13 +14,15 @@ type Period = 'DAY' | 'WEEK' | 'MONTH';
 const formatDuration = (mins: number) => {
   const h = Math.floor(mins / 60);
   const m = mins % 60;
-  if (h === 0) return `${m}m`;
-  if (m === 0) return `${h}h`;
-  return `${h}h ${m}m`;
+  return h === 0 ? `${m}m` : m === 0 ? `${h}h` : `${h}h ${m}m`;
 };
 
 const formatTime = (timestamp: number) => {
-  return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+  try {
+    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+  } catch (e) {
+    return '--:--';
+  }
 };
 
 const getIconByName = (name: string) => {
@@ -39,28 +41,30 @@ const StatsBoard: React.FC<StatsBoardProps> = ({
   const [editingRecord, setEditingRecord] = useState<FocusRecord | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // 🛡️ 第一重防护：确保 categories 永远是数组
+  // 🛡️ 强制检查，确保这些变量在任何时候都是数组
+  const safeHistory = useMemo(() => Array.isArray(history) ? history : [], [history]);
   const safeCategories = useMemo(() => Array.isArray(categories) ? categories : [], [categories]);
 
   const filteredHistory = useMemo(() => {
-    const safeHistory = Array.isArray(history) ? history : [];
     const now = new Date();
     if (period === 'DAY') {
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-      return safeHistory.filter(r => r.timestamp >= todayStart);
+      return safeHistory.filter(r => r && r.timestamp >= todayStart);
     } else if (period === 'WEEK') {
       const weekAgo = now.getTime() - 7 * 24 * 60 * 60 * 1000;
-      return safeHistory.filter(r => r.timestamp >= weekAgo);
+      return safeHistory.filter(r => r && r.timestamp >= weekAgo);
     } else {
       const monthAgo = now.getTime() - 30 * 24 * 60 * 60 * 1000;
-      return safeHistory.filter(r => r.timestamp >= monthAgo);
+      return safeHistory.filter(r => r && r.timestamp >= monthAgo);
     }
-  }, [history, period]);
+  }, [safeHistory, period]);
 
   const stats = useMemo(() => {
     const categoryTotals: Record<string, number> = {};
     filteredHistory.forEach(r => {
-      categoryTotals[r.category] = (categoryTotals[r.category] || 0) + r.duration;
+      if (r && r.category) {
+        categoryTotals[r.category] = (categoryTotals[r.category] || 0) + (r.duration || 0);
+      }
     });
     const grandTotal = Object.values(categoryTotals).reduce((a: number, b: number) => a + b, 0);
     return { categoryTotals, grandTotal, count: filteredHistory.length };
@@ -68,13 +72,15 @@ const StatsBoard: React.FC<StatsBoardProps> = ({
 
   const getCategoryColor = (cat: string, index: number) => {
     const baseColors = ['#8b4513', '#a67c52', '#5d4037', '#3e2723', '#166534', '#2e7d32'];
+    // 🛡️ 极其关键的修复：如果 safeCategories 为空或未定义，绝不执行 indexOf
+    if (!safeCategories || safeCategories.length === 0) return baseColors[index % baseColors.length];
     const idx = safeCategories.indexOf(cat);
     return baseColors[idx >= 0 ? idx % baseColors.length : index % baseColors.length];
   };
 
   const handleUpdate = (updated: FocusRecord) => {
-    if (onUpdateHistory) {
-      const newHistory = (Array.isArray(history) ? history : []).map(r => r.id === updated.id ? updated : r);
+    if (onUpdateHistory && updated) {
+      const newHistory = safeHistory.map(r => r.id === updated.id ? updated : r);
       onUpdateHistory(newHistory);
       setEditingRecord(null);
     }
@@ -82,11 +88,12 @@ const StatsBoard: React.FC<StatsBoardProps> = ({
 
   const handleDelete = (id: string) => {
     if (window.confirm("Delete this cooking record?") && onUpdateHistory) {
-      onUpdateHistory((Array.isArray(history) ? history : []).filter(r => r.id !== id));
+      onUpdateHistory(safeHistory.filter(r => r.id !== id));
       setEditingRecord(null);
     }
   };
 
+  // 自动滚动到早 8 点
   useEffect(() => {
     if (period === 'DAY' && !drillDown) {
       const timer = setTimeout(() => {
@@ -110,12 +117,11 @@ const StatsBoard: React.FC<StatsBoardProps> = ({
             <span className="text-[9px] font-bold opacity-20 -ml-12 -mt-2 w-10 text-right font-mono">{hour.toString().padStart(2, '0')}:00</span>
           </div>
         ))}
-
         {records.map((record, idx) => {
+          if (!record) return null;
           const date = new Date(record.timestamp);
           const startMins = date.getHours() * 60 + date.getMinutes();
           const color = getCategoryColor(record.category, idx);
-
           return (
             <div 
               key={record.id}
@@ -123,7 +129,7 @@ const StatsBoard: React.FC<StatsBoardProps> = ({
               className="absolute left-2 right-6 rounded-md px-2 border border-white/40 shadow-sm flex flex-col justify-center overflow-hidden transition-all hover:ring-2 hover:ring-[#8b4513]/30 z-20 group cursor-pointer active:scale-[0.98]"
               style={{ 
                 top: startMins * pixelsPerMin, 
-                height: Math.max(record.duration * pixelsPerMin, 22), 
+                height: Math.max((record.duration || 0) * pixelsPerMin, 22), 
                 backgroundColor: `${color}18`,
                 borderLeft: `4px solid ${color}`
               }}
@@ -140,8 +146,10 @@ const StatsBoard: React.FC<StatsBoardProps> = ({
   };
 
   const renderSimpleList = (records: FocusRecord[]) => {
-    if (records.length === 0) return <div className="py-20 text-center opacity-20 italic">🍂 No history in this period</div>;
-    const grouped = records.reduce((acc, rec) => {
+    const validRecords = records.filter(r => r);
+    if (validRecords.length === 0) return <div className="py-20 text-center opacity-20 italic">🍂 No history here</div>;
+    
+    const grouped = validRecords.reduce((acc, rec) => {
       const date = new Date(rec.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', weekday: 'short' });
       if (!acc[date]) acc[date] = [];
       acc[date].push(rec);
@@ -177,7 +185,6 @@ const StatsBoard: React.FC<StatsBoardProps> = ({
       <div className="flex flex-col md:flex-row justify-between items-center mb-10 gap-6">
         <div>
           <h2 className="text-2xl font-bold uppercase tracking-widest text-[#8b4513] flex items-center gap-3">📓 Hearth History</h2>
-          <p className="text-[10px] uppercase tracking-[0.2em] font-bold opacity-30 mt-1">Countryside Stove Records</p>
         </div>
         <div className="flex bg-[#e5dec9] p-1.5 rounded-xl border border-[#8b4513]/10">
           {(['DAY', 'WEEK', 'MONTH'] as Period[]).map((p) => (
@@ -207,13 +214,9 @@ const StatsBoard: React.FC<StatsBoardProps> = ({
              ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center text-[#8b4513]/20 border-2 border-dashed border-[#8b4513]/10 rounded-full">
                   <span className="text-4xl">🍂</span>
-                  <p className="text-[9px] mt-2 font-bold uppercase tracking-widest">No Logs</p>
+                  <p className="text-[9px] mt-2 font-bold uppercase tracking-widest">Empty Stove</p>
                 </div>
              )}
-             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-               <span className="text-3xl font-bold text-[#8b4513]">{stats.count}</span>
-               <span className="text-[8px] font-bold opacity-30 uppercase tracking-tighter">Sessions</span>
-             </div>
            </div>
            
            <div className="w-full space-y-2 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
@@ -235,7 +238,7 @@ const StatsBoard: React.FC<StatsBoardProps> = ({
              {drillDown && <button onClick={() => setDrillDown(null)} className="text-[8px] font-bold text-[#8b4513]/40 hover:text-[#8b4513] uppercase">Show All</button>}
            </div>
            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
-              {period === 'DAY' && !drillDown ? renderTimeline(filteredHistory) : renderSimpleList(drillDown ? filteredHistory.filter(r => r.category === drillDown) : filteredHistory)}
+              {period === 'DAY' && !drillDown ? renderTimeline(filteredHistory) : renderSimpleList(drillDown ? filteredHistory.filter(r => r && r.category === drillDown) : filteredHistory)}
            </div>
         </div>
       </div>
@@ -269,7 +272,7 @@ const StatsBoard: React.FC<StatsBoardProps> = ({
                 </div>
               </div>
               <div className="flex flex-col gap-3 pt-4">
-                <button onClick={() => handleUpdate(editingRecord)} className="w-full bg-[#8b4513] text-white py-4 rounded-2xl font-bold text-sm shadow-lg active:scale-95 transition-all">Update Journal</button>
+                <button onClick={() => handleUpdate(editingRecord)} className="w-full bg-[#8b4513] text-white py-4 rounded-2xl font-bold text-sm shadow-lg">Update Journal</button>
                 <div className="flex gap-3">
                   <button onClick={() => setEditingRecord(null)} className="flex-1 bg-gray-100 text-gray-500 py-3 rounded-xl font-bold text-xs">Back</button>
                   <button onClick={() => handleDelete(editingRecord.id)} className="flex-1 bg-red-50 text-red-500 py-3 rounded-xl font-bold text-xs border border-red-100">Delete</button>
