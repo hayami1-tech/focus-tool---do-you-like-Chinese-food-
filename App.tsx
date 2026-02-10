@@ -76,6 +76,7 @@ const App: React.FC = () => {
         setTimeLeft((prev) => prev - 1);
       }, 1000);
     } else if (timeLeft === 0 && status === 'RUNNING') {
+      // 💡 优化：先更新状态再存历史，防止重复执行
       setStatus('FINISHED');
       if (mode === TimerMode.FOCUS) {
         const record: FocusRecord = {
@@ -144,7 +145,6 @@ const App: React.FC = () => {
     setCategoryToDelete(null);
   };
 
-  // 💡 这里的逻辑实现了你的需求：
   // 过滤出只有当天的记录，用于右侧显示
   const dailyHistory = history.filter(record => {
     const recordDate = new Date(record.timestamp).toDateString();
@@ -226,7 +226,6 @@ const App: React.FC = () => {
               onModeToggle={toggleMode}
             />
             
-            {/* 💡 这里改为只传 dailyHistory (当天的菜) */}
             <DishCollection history={dailyHistory} />
             
             <p className="mt-4 text-[9px] text-center opacity-30 font-bold uppercase tracking-widest italic">
@@ -235,11 +234,15 @@ const App: React.FC = () => {
           </div>
         </div>
       ) : (
-        /* 💡 历史页面依然传入完整的 history，保证周报月报数据正确 */
-        <StatsBoard history={history} categories={categories} />
+        /* 💡 修复白屏的关键：这里必须传入 onUpdateHistory */
+        <StatsBoard 
+          history={history} 
+          categories={categories} 
+          onUpdateHistory={setHistory} 
+        />
       )}
 
-      {/* 以下是 Modal 部分，保持原样 */}
+      {/* 以下 Modal 保持原样 */}
       {showCatModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#f3eee3] w-full max-w-md rounded-2xl border-4 border-[#8b4513] shadow-2xl p-6">
