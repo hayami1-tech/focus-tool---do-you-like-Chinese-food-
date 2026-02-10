@@ -117,7 +117,6 @@ const App: React.FC = () => {
       alert("Keep at least one event type.");
       return;
     }
-
     const hasHistory = history.some(r => r.category === cat);
     if (hasHistory) {
       setCategoryToDelete(cat);
@@ -135,11 +134,9 @@ const App: React.FC = () => {
     } else {
       setHistory(prev => prev.filter(r => r.category !== cat));
     }
-
     const updated = categories.filter(c => c !== cat);
     setCategories(updated);
     if (currentCategory === cat) setCurrentCategory(updated[0]);
-    
     setShowMergeModal(false);
     setCategoryToDelete(null);
   };
@@ -196,9 +193,47 @@ const App: React.FC = () => {
         />
       )}
 
-      {/* Modals... (省略部分重复的 Modal 代码以保持简洁，逻辑与之前一致) */}
-      {showCatModal && ( /* ... */ )}
-      {showMergeModal && ( /* ... */ )}
+      {/* Category Modal */}
+      {showCatModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#f3eee3] w-full max-w-md rounded-2xl border-4 border-[#8b4513] p-6 shadow-2xl">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="heytea-font font-bold text-[#8b4513] uppercase">Manage Events</h2>
+              <button onClick={() => setShowCatModal(false)} className="text-2xl">&times;</button>
+            </div>
+            <div className="flex gap-2 mb-4">
+              <input type="text" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} className="flex-1 px-4 py-2 rounded-lg border-2 border-[#8b4513]/20" placeholder="New category..." />
+              <button onClick={addCategory} className="bg-[#8b4513] text-white px-4 py-2 rounded-lg">Add</button>
+            </div>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {categories.map(cat => (
+                <div key={cat} className="flex justify-between p-2 bg-white/40 rounded-lg">
+                  <span className="text-sm font-bold">{cat}</span>
+                  <button onClick={() => deleteCategoryRequest(cat)} className="text-red-500 text-xs font-bold">DELETE</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Merge Modal */}
+      {showMergeModal && categoryToDelete && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[60] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-3xl p-8 border-t-8 border-[#8b4513]">
+            <h3 className="text-xl font-bold text-center mb-4">Merge History?</h3>
+            <select value={mergeTarget} onChange={(e) => setMergeTarget(e.target.value)} className="w-full p-3 mb-6 bg-[#f3eee3] rounded-xl font-bold">
+              {categories.filter(c => c !== categoryToDelete).map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+            <div className="flex flex-col gap-3">
+              <button onClick={() => executeDelete(categoryToDelete, mergeTarget)} className="bg-[#8b4513] text-white py-3 rounded-xl font-bold">Merge and Delete</button>
+              <button onClick={() => setShowMergeModal(false)} className="bg-gray-100 py-3 rounded-xl">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <footer className="mt-20 mb-10 text-center opacity-40 text-xs uppercase tracking-widest">
         Traditional Kitchen Focus • Countryside Zen
@@ -208,4 +243,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-
