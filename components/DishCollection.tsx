@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { FocusRecord, FoodItem } from '../types';
+import { FocusRecord } from '../types';
 import { FOOD_ITEMS } from '../constants';
 import FoodIllustration from './FoodIllustration';
 
@@ -9,12 +8,15 @@ interface DishCollectionProps {
 }
 
 const DishCollection: React.FC<DishCollectionProps> = ({ history }) => {
-  // 只显示专注模式下产生的菜肴
-  const completedDishes = history.filter(record => 
-    FOOD_ITEMS.some(item => item.name === record.foodName)
-  );
+  // 1. 核心改动：先过滤出“今天”的记录，再过滤出“专注模式”的菜肴
+  const todayStr = new Date().toDateString();
+  
+  const completedDishes = history.filter(record => {
+    const isToday = new Date(record.timestamp).toDateString() === todayStr;
+    const isFood = FOOD_ITEMS.some(item => item.name === record.foodName);
+    return isToday && isFood;
+  });
 
-  // 获取对应的图标名
   const getIconByName = (name: string) => {
     const item = FOOD_ITEMS.find(f => f.name === name);
     return item ? item.iconName : 'default';
@@ -23,7 +25,7 @@ const DishCollection: React.FC<DishCollectionProps> = ({ history }) => {
   return (
     <div className="mt-6 bg-[#fdfbf7] p-6 rounded-lg border-4 border-[#8b4513] shadow-lg flex flex-col h-[300px]">
       <h3 className="text-xl font-bold flex items-center gap-2 heytea-font text-[#8b4513] mb-4">
-        <span className="text-2xl">🍱</span> Completed Dishes
+        <span className="text-2xl">🍱</span> Today's Harvest
       </h3>
       
       <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
@@ -33,12 +35,12 @@ const DishCollection: React.FC<DishCollectionProps> = ({ history }) => {
               <div 
                 key={dish.id} 
                 className="group relative flex flex-col items-center animate-in zoom-in duration-300"
-                title={`${dish.foodName} (${new Date(dish.timestamp).toLocaleDateString()})`}
+                title={`${dish.foodName} (${new Date(dish.timestamp).toLocaleTimeString()})`}
               >
                 <div className="relative w-12 h-12 bg-white rounded-full shadow-sm border border-[#8b4513]/10 flex items-center justify-center p-1 group-hover:scale-110 transition-transform overflow-hidden">
                   <FoodIllustration name={getIconByName(dish.foodName)} className="w-full h-full" />
                   
-                  {/* Tomato Count Badge inside the circle at the bottom (Removed #) */}
+                  {/* 倒序编号，显示这是今天的第几个菜 */}
                   <div className="absolute bottom-0 inset-x-0 h-4 bg-[#8b4513]/80 flex items-center justify-center">
                     <span className="text-[7px] font-bold text-white leading-none">
                       {completedDishes.length - index}
@@ -55,7 +57,9 @@ const DishCollection: React.FC<DishCollectionProps> = ({ history }) => {
         ) : (
           <div className="h-full flex flex-col items-center justify-center opacity-20 text-[#8b4513] italic">
             <span className="text-4xl mb-2">🍳</span>
-            <p className="text-xs font-bold tracking-widest">Stay Hungry, Stay Patient, the food is cooking...</p>
+            <p className="text-xs font-bold tracking-widest text-center">
+              The stove is cold... <br/> Start cooking to fill your plate!
+            </p>
           </div>
         )}
       </div>
@@ -63,7 +67,7 @@ const DishCollection: React.FC<DishCollectionProps> = ({ history }) => {
       {completedDishes.length > 0 && (
         <div className="mt-3 pt-2 border-t border-[#8b4513]/10 text-right">
           <span className="text-[10px] font-bold text-[#8b4513]/50 uppercase tracking-widest">
-            Total: {completedDishes.length} Dishes
+            Today: {completedDishes.length} Dishes
           </span>
         </div>
       )}
