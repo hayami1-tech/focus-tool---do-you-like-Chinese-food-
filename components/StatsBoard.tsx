@@ -68,7 +68,6 @@ const StatsBoard: React.FC<StatsBoardProps> = ({
 
   const getCategoryColor = (cat: string, index: number) => {
     const baseColors = ['#8b4513', '#a67c52', '#5d4037', '#3e2723', '#166534', '#2e7d32'];
-    // 🛡️ 第二重防护：在 indexOf 前检查 safeCategories
     const idx = safeCategories.indexOf(cat);
     return baseColors[idx >= 0 ? idx % baseColors.length : index % baseColors.length];
   };
@@ -174,4 +173,114 @@ const StatsBoard: React.FC<StatsBoardProps> = ({
   };
 
   return (
-    <div className="w-full max-w-6xl bg-[#fdfbf7] p-6 md:p-10 rounded-2xl border-
+    <div className="w-full max-w-6xl bg-[#fdfbf7] p-6 md:p-10 rounded-2xl border-4 border-[#8b4513] shadow-2xl animate-in fade-in zoom-in duration-300 relative">
+      <div className="flex flex-col md:flex-row justify-between items-center mb-10 gap-6">
+        <div>
+          <h2 className="text-2xl font-bold uppercase tracking-widest text-[#8b4513] flex items-center gap-3">📓 Hearth History</h2>
+          <p className="text-[10px] uppercase tracking-[0.2em] font-bold opacity-30 mt-1">Countryside Stove Records</p>
+        </div>
+        <div className="flex bg-[#e5dec9] p-1.5 rounded-xl border border-[#8b4513]/10">
+          {(['DAY', 'WEEK', 'MONTH'] as Period[]).map((p) => (
+            <button key={p} onClick={() => { setPeriod(p); setDrillDown(null); }} className={`px-8 py-2.5 rounded-lg text-xs font-bold transition-all tracking-widest ${period === p ? 'bg-[#8b4513] text-white shadow-md' : 'text-[#8b4513]/50 hover:text-[#8b4513]'}`}>{p}</button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-10">
+        <div className="md:col-span-5 flex flex-col items-center">
+           <div className="w-60 h-60 relative mb-10">
+             {stats.grandTotal > 0 ? (
+                <svg viewBox="-1 -1 2 2" className="w-full h-full transform -rotate-90">
+                  {Object.entries(stats.categoryTotals).map(([cat, val], index) => {
+                    let cumulative = 0;
+                    const totals = Object.values(stats.categoryTotals);
+                    for (let i = 0; i < index; i++) cumulative += totals[i] / stats.grandTotal;
+                    const percent = val / stats.grandTotal;
+                    const startX = Math.cos(2 * Math.PI * cumulative);
+                    const startY = Math.sin(2 * Math.PI * cumulative);
+                    const endX = Math.cos(2 * Math.PI * (cumulative + percent));
+                    const endY = Math.sin(2 * Math.PI * (cumulative + percent));
+                    return <path key={cat} d={`M 0 0 L ${startX} ${startY} A 1 1 0 ${percent > 0.5 ? 1 : 0} 1 ${endX} ${endY} Z`} fill={getCategoryColor(cat, index)} className="hover:opacity-80 cursor-pointer" />;
+                  })}
+                  <circle cx="0" cy="0" r="0.45" fill="#fdfbf7" />
+                </svg>
+             ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center text-[#8b4513]/20 border-2 border-dashed border-[#8b4513]/10 rounded-full">
+                  <span className="text-4xl">🍂</span>
+                  <p className="text-[9px] mt-2 font-bold uppercase tracking-widest">No Logs</p>
+                </div>
+             )}
+             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+               <span className="text-3xl font-bold text-[#8b4513]">{stats.count}</span>
+               <span className="text-[8px] font-bold opacity-30 uppercase tracking-tighter">Sessions</span>
+             </div>
+           </div>
+           
+           <div className="w-full space-y-2 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
+              {Object.entries(stats.categoryTotals).sort((a,b) => b[1]-a[1]).map(([cat, val], index) => val > 0 && (
+                <button key={cat} onClick={() => setDrillDown(cat)} className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all ${drillDown === cat ? 'border-[#8b4513] bg-[#f3eee3]' : 'border-transparent bg-white/40 hover:bg-white'}`}>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getCategoryColor(cat, index) }} />
+                    <span className="text-[10px] font-bold text-[#4a3728] uppercase">{cat}</span>
+                  </div>
+                  <span className="text-[11px] font-bold text-[#8b4513]">{formatDuration(val)}</span>
+                </button>
+              ))}
+           </div>
+        </div>
+
+        <div className="md:col-span-7 bg-[#f3eee3] rounded-3xl p-6 md:p-8 h-[620px] flex flex-col relative overflow-hidden shadow-inner border border-[#8b4513]/5">
+           <div className="flex justify-between items-center mb-6">
+             <h3 className="text-base font-bold text-[#8b4513] uppercase tracking-wider">{drillDown ? `${drillDown} Log` : "Timeline"}</h3>
+             {drillDown && <button onClick={() => setDrillDown(null)} className="text-[8px] font-bold text-[#8b4513]/40 hover:text-[#8b4513] uppercase">Show All</button>}
+           </div>
+           <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
+              {period === 'DAY' && !drillDown ? renderTimeline(filteredHistory) : renderSimpleList(drillDown ? filteredHistory.filter(r => r.category === drillDown) : filteredHistory)}
+           </div>
+        </div>
+      </div>
+
+      {editingRecord && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-[#fdfbf7] w-full max-w-md rounded-3xl border-4 border-[#8b4513] p-8 shadow-2xl">
+            <h3 className="text-xl font-bold text-[#8b4513] mb-6 uppercase tracking-widest">📝 Edit Record</h3>
+            <div className="space-y-6">
+              <div>
+                <label className="text-[10px] font-bold uppercase opacity-40 mb-2 block">Category</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {safeCategories.map(cat => (
+                    <button key={cat} onClick={() => setEditingRecord({...editingRecord, category: cat})} className={`py-2 px-3 rounded-xl text-[10px] font-bold border-2 transition-all ${editingRecord.category === cat ? 'bg-[#8b4513] text-white border-[#8b4513]' : 'bg-white border-[#8b4513]/10 text-[#8b4513]'}`}>{cat}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold uppercase opacity-40 mb-2 block">Duration (min)</label>
+                  <input type="number" value={editingRecord.duration} onChange={(e) => setEditingRecord({...editingRecord, duration: parseInt(e.target.value) || 0})} className="w-full bg-[#f3eee3] border-none rounded-xl px-4 py-3 font-bold text-[#8b4513]" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase opacity-40 mb-2 block">Time</label>
+                  <input type="time" value={formatTime(editingRecord.timestamp)} onChange={(e) => {
+                    const [h, m] = e.target.value.split(':');
+                    const d = new Date(editingRecord.timestamp);
+                    d.setHours(parseInt(h), parseInt(m));
+                    setEditingRecord({...editingRecord, timestamp: d.getTime()});
+                  }} className="w-full bg-[#f3eee3] border-none rounded-xl px-4 py-3 font-bold text-[#8b4513]" />
+                </div>
+              </div>
+              <div className="flex flex-col gap-3 pt-4">
+                <button onClick={() => handleUpdate(editingRecord)} className="w-full bg-[#8b4513] text-white py-4 rounded-2xl font-bold text-sm shadow-lg active:scale-95 transition-all">Update Journal</button>
+                <div className="flex gap-3">
+                  <button onClick={() => setEditingRecord(null)} className="flex-1 bg-gray-100 text-gray-500 py-3 rounded-xl font-bold text-xs">Back</button>
+                  <button onClick={() => handleDelete(editingRecord.id)} className="flex-1 bg-red-50 text-red-500 py-3 rounded-xl font-bold text-xs border border-red-100">Delete</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default StatsBoard;
