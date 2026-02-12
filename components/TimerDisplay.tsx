@@ -1,188 +1,163 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { TimerMode, FoodItem, TimerStatus, ProjectCategory, FocusRecord } from './types';
+import { FOOD_ITEMS, BREAK_ITEMS } from './constants';
+import Stove from './components/Stove';
+import Pantry from './components/Pantry';
+import TimerDisplay from './components/TimerDisplay';
+import StatsBoard from './components/StatsBoard';
+import DishCollection from './components/DishCollection';
 
-import React, { useState } from 'react';
-import { TimerStatus, TimerMode } from '../types';
+const App: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'FOCUS' | 'HISTORY'>('FOCUS');
+  const [mode, setMode] = useState<TimerMode>(TimerMode.FOCUS);
+  const [status, setStatus] = useState<TimerStatus>('IDLE');
+  const [selectedFood, setSelectedFood] = useState<FoodItem>(FOOD_ITEMS[0]);
+  
+  const [categories, setCategories] = useState<ProjectCategory[]>(() => {
+    const saved = localStorage.getItem('zao-tai-categories');
+    return saved ? JSON.parse(saved) : ['Work', 'Study', 'Health', 'Zen'];
+  });
+  const [currentCategory, setCurrentCategory] = useState<ProjectCategory>(categories[0]);
+  
+  const [timeLeft, setTimeLeft] = useState(selectedFood.duration * 60);
+  const [sessionDurationMins, setSessionDurationMins] = useState(selectedFood.duration);
+  const [history, setHistory] = useState<FocusRecord[]>(() => {
+    const saved = localStorage.getItem('zao-tai-history');
+    return saved ? JSON.parse(saved) : [];
+  });
 
-interface TimerDisplayProps {
-  timeLeft: number;
-  status: TimerStatus;
-  onStart: () => void;
-  onPause: () => void;
-  onReset: () => void;
-  onFinishCountUp: () => void;
-  onTimeChange: (newTotalSeconds: number) => void;
-  mode: TimerMode;
-  onModeChange: (mode: TimerMode) => void;
-}
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-const TimerDisplay: React.FC<TimerDisplayProps> = ({ 
-  timeLeft, 
-  status, 
-  onStart, 
-  onPause, 
-  onReset,
-  onFinishCountUp,
-  onTimeChange,
-  mode,
-  onModeChange
-}) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editValue, setEditValue] = useState('');
+  // --- 关键函数：重置计时器 ---
+  const resetTimer = useCallback((newFood?: FoodItem, targetMode?: TimerMode) => {
+    const currentMode = targetMode !== undefined ? targetMode : mode;
+    const food = newFood || selectedFood;
+    
+    setStatus('IDLE');
+    if (timerRef.current) clearInterval(timerRef.current);
 
-  const minutes = Math.floor(timeLeft / 60);
-  const seconds = timeLeft % 60;
+    if (currentMode === TimerMode.COUNT_UP) {
+      setTimeLeft(0); // 彻底修复：正计时强制归零
+      setSessionDurationMins(0);
+    } else {
+      setTimeLeft(food.duration * 60);
+      setSessionDurationMins(food.duration);
+    }
+  }, [selectedFood, mode]);
 
-  const formattedTime = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  // --- 关键函数：切换模式 ---
+  const toggleMode = (newMode: TimerMode) => {
+    setMode(newMode);
+    // 切换模式时，必须传入 newMode 强制重置
+    resetTimer(selectedFood, newMode); 
+  };
 
-  const isCountUp = mode === TimerMode.COUNT_UP;
+  const startTimer = () => setStatus('RUNNING');
+  const pauseTimer = () => setStatus('PAUSED');
 
-  const getStatusText = () => {
-    if (status === 'IDLE') return isCountUp ? 'Fire is Ready' : 'Ready to Cook';
+  const handleFinishCountUp = () => {
+    const durationMins = Math.floor(timeLeft / 60);
+    if (durationMins >= 1) { 
+      const record: FocusRecord = {
+        id: Date.now().toString(),
+        category: currentCategory,
+        duration: durationMins,
+        timestamp: Date.now() - (timeLeft * 1000),
+        foodName: 'Free Steaming' 
+      };
+      setHistory(prev => [record, ...prev]);
+      resetTimer(); 
+      alert(`Cooking done! You focused for ${durationMins} minutes.`);
+    } else {
+      alert("Too short to cook anything! Keep going.");
+      // 不做重置，让用户可以继续
+    }
+  };
+
+  const handleManualTimeChange = (newTotalSeconds: number) => {
+    if (status === 'IDLE' && mode !== TimerMode.COUNT_UP) {
+      setTimeLeft(newTotalSeconds);
+      setSessionDurationMins(Math.ceil(newTotalSeconds / 60));
+    }
+  };
+
+  // --- 核心计时逻辑 ---
+  useEffect(() => {
     if (status === 'RUNNING') {
-      if (isCountUp) return 'Simmering freely...';
-      return mode === TimerMode.FOCUS ? 'Cooking by recipe...' : 'Tea Time';
+      timerRef.current = setInterval(() => {
+        if (mode === TimerMode.COUNT_UP) {
+          setTimeLeft((prev) => prev + 1); // 正计时递增
+        } else {
+          setTimeLeft((prev) => {
+            if (prev <= 1) {
+              // 倒计时结束逻辑...
+              const record: FocusRecord = {
+                id: Date.now().toString(),
+                category: currentCategory,
+                duration: sessionDurationMins,
+                timestamp: Date.now() - (sessionDurationMins * 60000),
+                foodName: selectedFood.name
+              };
+              setHistory(prevHist => [record, ...prevHist]);
+              setStatus('FINISHED');
+              return 0;
+            }
+            return prev - 1;
+          });
+        }
+      }, 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
     }
-    if (status === 'PAUSED') return 'Keeping Warm...';
-    return 'Pot Ready!';
-  };
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [status, mode, currentCategory, selectedFood, sessionDurationMins]);
 
-  const handleEditStart = () => {
-    if (status === 'IDLE' && !isCountUp) {
-      setIsEditing(true);
-      setEditValue(minutes.toString());
-    }
-  };
-
-  const handleEditSubmit = () => {
-    const newMinutes = parseInt(editValue, 10);
-    if (!isNaN(newMinutes) && newMinutes >= 0 && newMinutes <= 999) {
-      onTimeChange(newMinutes * 60);
-    }
-    setIsEditing(false);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleEditSubmit();
-    } else if (e.key === 'Escape') {
-      setIsEditing(false);
-    }
+  // 其余代码保持不变 (handleFoodSelect, addCategory 等)...
+  const handleFoodSelect = (food: FoodItem) => {
+    if (mode === TimerMode.COUNT_UP) setMode(TimerMode.FOCUS);
+    setSelectedFood(food);
+    resetTimer(food, TimerMode.FOCUS);
   };
 
   return (
-    <div className="flex flex-col items-center w-full max-w-md mx-auto">
-      {/* Mode Switcher */}
-      <div className="flex bg-[#e5dec9] p-1 rounded-full mb-6 shadow-inner border border-[#8b4513]/10">
-        <button 
-          onClick={() => status === 'IDLE' && onModeChange(TimerMode.FOCUS)}
-          className={`px-6 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${!isCountUp ? 'bg-[#8b4513] text-white shadow-md' : 'text-[#8b4513]/40'}`}
-          disabled={status !== 'IDLE'}
-        >
-          Timed
-        </button>
-        <button 
-          onClick={() => status === 'IDLE' && onModeChange(TimerMode.COUNT_UP)}
-          className={`px-6 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${isCountUp ? 'bg-[#8b4513] text-white shadow-md' : 'text-[#8b4513]/40'}`}
-          disabled={status !== 'IDLE'}
-        >
-          Free
-        </button>
-      </div>
+    <div className="min-h-screen bg-[#f3eee3] text-[#4a3728] p-4 md:p-8 flex flex-col items-center">
+      {/* Header 部分保持不变... */}
+      <header className="w-full max-w-6xl flex flex-col items-center mb-10 gap-6">
+        <h1 className="text-3xl md:text-4xl heytea-font font-bold tracking-[0.2em] text-[#8b4513] text-center uppercase">Grandma’s Stove</h1>
+        <nav className="flex bg-[#e5dec9] p-1 rounded-full shadow-inner">
+           <button onClick={() => setActiveTab('FOCUS')} className={`px-8 py-2.5 rounded-full text-sm font-bold heytea-font transition-all ${activeTab === 'FOCUS' ? 'bg-[#8b4513] text-white shadow-md' : 'text-[#8b4513]/60 hover:text-[#8b4513]'}`}>Focus</button>
+           <button onClick={() => setActiveTab('HISTORY')} className={`px-8 py-2.5 rounded-full text-sm font-bold heytea-font transition-all ${activeTab === 'HISTORY' ? 'bg-[#8b4513] text-white shadow-md' : 'text-[#8b4513]/60 hover:text-[#8b4513]'}`}>History</button>
+        </nav>
+      </header>
 
-      {/* The Timer Board */}
-      <div className="relative w-full bg-[#fdfbf7] p-8 rounded-3xl border-4 border-[#8b4513] shadow-2xl flex flex-col items-center">
-         {/* Top Hanging Decoration */}
-         <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-32 h-8 bg-[#8b4513] rounded-t-xl flex justify-center items-center gap-2">
-           <div className="w-2 h-2 bg-[#f3eee3] rounded-full"></div>
-           <div className="w-2 h-2 bg-[#f3eee3] rounded-full"></div>
-           <div className="w-2 h-2 bg-[#f3eee3] rounded-full"></div>
-         </div>
-         
-         <div className="mt-4 mb-2 text-center text-[10px] font-bold uppercase tracking-[0.2em] text-[#8b4513]/40 heytea-font">
-           {getStatusText()}
-         </div>
-
-         <div className="text-8xl md:text-9xl font-mono font-bold tracking-tight text-[#4a3728] tabular-nums flex justify-center items-center h-32 w-full">
-           {isEditing ? (
-             <div className="flex items-center">
-                <input
-                  autoFocus
-                  type="text"
-                  value={editValue}
-                  onChange={(e) => setEditValue(e.target.value.replace(/\D/g, ''))}
-                  onBlur={handleEditSubmit}
-                  onKeyDown={handleKeyDown}
-                  className="w-40 bg-transparent border-b-4 border-[#8b4513] outline-none text-center"
-                />
-                <span className="text-2xl ml-2 opacity-30 heytea-font">m</span>
-             </div>
-           ) : (
-             <span 
-               onClick={handleEditStart}
-               className={`${status === 'IDLE' && !isCountUp ? 'cursor-pointer hover:text-[#8b4513] transition-colors border-b-2 border-transparent hover:border-[#8b4513]/20' : 'pointer-events-none'}`}
-             >
-               {formattedTime}
-             </span>
-           )}
-         </div>
-
-         {/* Integrated Controls */}
-         <div className="mt-6 flex items-center justify-center gap-6 w-full py-4 border-t border-[#8b4513]/5">
-            {status === 'IDLE' || status === 'PAUSED' || status === 'FINISHED' ? (
-              <button 
-                onClick={status === 'FINISHED' ? (isCountUp ? onFinishCountUp : onReset) : onStart}
-                className="w-16 h-16 bg-[#8b4513] text-white rounded-full shadow-xl hover:scale-110 active:scale-95 transition-all flex items-center justify-center"
-              >
-                {status === 'FINISHED' ? (
-                  <svg className="w-8 h-8 fill-none stroke-current stroke-2" viewBox="0 0 24 24">
-                    <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                ) : (
-                  <svg className="w-8 h-8 fill-current" viewBox="0 0 24 24">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                )}
-              </button>
-            ) : (
-              <button 
-                onClick={onPause}
-                className="w-16 h-16 bg-[#a67c52] text-white rounded-full shadow-xl hover:scale-110 active:scale-95 transition-all flex items-center justify-center"
-              >
-                <svg className="w-8 h-8 fill-current" viewBox="0 0 24 24">
-                  <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-                </svg>
-              </button>
-            )}
-
-            {(status === 'RUNNING' || status === 'PAUSED') && (
-              <button 
-                onClick={isCountUp ? onFinishCountUp : onReset}
-                className="w-12 h-12 bg-white border-2 border-[#8b4513]/20 text-[#8b4513] hover:border-[#8b4513]/40 rounded-full shadow-sm transition-all flex flex-col items-center justify-center group"
-                title={isCountUp ? "Finish and Serve" : "Reset Stove"}
-              >
-                {isCountUp ? (
-                  <span className="text-[8px] font-bold uppercase tracking-tighter leading-none group-hover:scale-110 transition-transform">Finish</span>
-                ) : (
-                  <svg className="w-5 h-5 fill-none stroke-current stroke-2" viewBox="0 0 24 24">
-                    <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                )}
-              </button>
-            )}
-         </div>
-      </div>
-      
-      {status === 'IDLE' && !isCountUp && (
-        <p className="mt-4 text-[9px] font-bold text-[#8b4513]/30 uppercase tracking-[0.3em]">
-          Click time to customize minutes
-        </p>
-      )}
-      {status === 'IDLE' && isCountUp && (
-        <p className="mt-4 text-[9px] font-bold text-[#8b4513]/30 uppercase tracking-[0.3em]">
-          Free cooking: count your deep focus
-        </p>
+      {activeTab === 'FOCUS' ? (
+        <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="lg:col-span-7 flex flex-col items-center">
+            <Stove isCooking={status === 'RUNNING'} food={selectedFood} status={status} />
+            <div className="mt-8 w-full">
+              <TimerDisplay 
+                timeLeft={timeLeft} 
+                status={status} 
+                onStart={startTimer} 
+                onPause={pauseTimer} 
+                onReset={() => resetTimer()} 
+                onFinishCountUp={handleFinishCountUp}
+                onTimeChange={handleManualTimeChange}
+                mode={mode} 
+                onModeChange={toggleMode}
+              />
+            </div>
+          </div>
+          <div className="lg:col-span-5">
+            <Pantry items={FOOD_ITEMS} selectedId={selectedFood.id} onSelect={handleFoodSelect} mode={mode} onModeToggle={toggleMode} />
+            <DishCollection history={history} />
+          </div>
+        </div>
+      ) : (
+        <StatsBoard history={history} categories={categories} onUpdateHistory={setHistory} />
       )}
     </div>
   );
 };
 
-export default TimerDisplay;
+export default App;
