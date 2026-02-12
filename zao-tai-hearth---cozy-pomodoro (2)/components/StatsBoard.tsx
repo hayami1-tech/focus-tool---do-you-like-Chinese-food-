@@ -227,9 +227,13 @@ const StatsBoard: React.FC<StatsBoardProps> = ({ history, categories, onUpdateHi
           return (
             <div 
               key={record.id}
-              onMouseDown={(e) => e.stopPropagation()} // 关键修复：防止触发背景的拖拽新建逻辑
+              onMouseDown={(e) => e.stopPropagation()} 
               onTouchStart={(e) => e.stopPropagation()}
-              onClick={(e) => { e.stopPropagation(); setEditingRecord(record); }}
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                // 明确设置编辑记录，弹窗会自动根据 record.timestamp 显示 11:30
+                setEditingRecord(record); 
+              }}
               className="absolute left-1 right-1 bg-white/60 border border-[#8b4513]/10 rounded px-2 flex items-center shadow-sm z-20 cursor-pointer hover:bg-white active:scale-[0.99] transition-all"
               style={{ top, height }}
             >
@@ -338,6 +342,7 @@ const StatsBoard: React.FC<StatsBoardProps> = ({ history, categories, onUpdateHi
               <div className="space-y-4">
                 <div>
                   <label className="text-[10px] font-bold uppercase opacity-40 mb-1 block">Time Started</label>
+                  {/* 此处 defaultValue 严格对应 record.timestamp 的小时和分钟 */}
                   <input name="start" type="time" defaultValue={new Date(editingRecord.timestamp).toTimeString().slice(0, 5)} className="w-full bg-white border-2 border-[#8b4513]/10 px-4 py-2.5 rounded-xl font-mono font-bold text-[#8b4513]" />
                 </div>
                 <div>
