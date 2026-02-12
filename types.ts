@@ -2,7 +2,8 @@
 export enum TimerMode {
   FOCUS = 'FOCUS',
   SHORT_BREAK = 'SHORT_BREAK',
-  LONG_BREAK = 'LONG_BREAK'
+  LONG_BREAK = 'LONG_BREAK',
+  COUNT_UP = 'COUNT_UP'
 }
 
 // Changed to string for dynamic user management

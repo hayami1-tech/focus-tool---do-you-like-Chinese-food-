@@ -1,14 +1,83 @@
+
 <!DOCTYPE html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zao Tai Hearth - 柴火灶番茄钟</title>
     <script src="https://cdn.tailwindcss.com"></script>
-  </head>
-  <body>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+            background-color: #f3eee3;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .heytea-font {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        @keyframes smoke {
+            0% { transform: translateY(0) scale(1) rotate(0deg); opacity: 0; }
+            10% { opacity: 0.4; }
+            50% { opacity: 0.2; transform: translateY(-150px) scale(1.8) rotate(20deg); }
+            100% { transform: translateY(-300px) scale(3) rotate(45deg); opacity: 0; }
+        }
+        .smoke-particle {
+            animation: smoke 6s infinite ease-out;
+        }
+        
+        .fire-flicker {
+            animation: flicker 2s infinite alternate ease-in-out;
+        }
+        @keyframes flicker {
+            0% { 
+                transform: scale(0.95) translateY(2px); 
+                opacity: 0.7;
+                filter: blur(2px) brightness(0.9);
+            }
+            100% { 
+                transform: scale(1.05) translateY(-2px); 
+                opacity: 1;
+                filter: blur(1px) brightness(1.2);
+            }
+        }
+
+        .fire-glow {
+            animation: glow 3s infinite alternate ease-in-out;
+        }
+        @keyframes glow {
+            0% { box-shadow: 0 0 20px 5px rgba(249, 115, 22, 0.2); }
+            100% { box-shadow: 0 0 40px 15px rgba(249, 115, 22, 0.4); }
+        }
+
+        /* 自定义滚动条 */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(139, 69, 19, 0.05);
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(139, 69, 19, 0.2);
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(139, 69, 19, 0.4);
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/"
+  }
+}
+</script>
+</head>
+<body>
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
-  </body>
+</body>
 </html>
